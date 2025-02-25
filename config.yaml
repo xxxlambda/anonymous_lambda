@@ -7,25 +7,16 @@ inspector_model : "gpt-4o-mini"
 api_key : ""
 base_url_conv_model : 'https://api.openai.com/v1'
 base_url_programmer : 'https://api.openai.com/v1'
-base_url_inspector : 'htts://api.openai.com/v1'
-max_token_conv_model: 4096 # the max token of the conversation model, this will determine the maximum length of the report.
+base_url_inspector : 'https://api.openai.com/v1'
 
 
 #================================================================================================
 #                                       Config of the system
 #================================================================================================
 streaming : True
-
-#cache_related
-oss_endpoint: ""
-oss_access_key_id: ""
-oss_access_secret: ""
-oss_bucket_name: ""
-expired_time: 36000 # The expired time of the link in cache
-cache_dir : "" # local cache dir
+project_cache_path : "cache/conv_cache/" # local cache path
 max_attempts : 5 # The max attempts of self-correcting
 max_exe_time: 18000 # max time for the execution
 
 #knowledge integration
-retrieval : False
-mode : "full"
+retrieval : False # whether to start a knowledge retrieval. If you don't create your knowledge base, you should set it to False
