@@ -1,19 +1,21 @@
 import queue
+import re
 # import streamlit as st
 import base64
 from io import BytesIO
 import re
 import os
+from typing import Tuple, Any
 import jupyter_client
 from PIL import Image
 from subprocess import PIPE
 from pprint import pprint
-import nbformat as nbf
+import nbformat
+from nbformat import v4 as nbf
+import time
+import ansi2html
 
-IPYKERNEL = os.environ.get('IPYKERNEL', 'dsagent')
-
-# client = get_client()
-
+IPYKERNEL = os.environ.get('IPYKERNEL', 'lambda')
 
 class CodeKernel(object):
     def __init__(self,
@@ -23,8 +25,9 @@ class CodeKernel(object):
                  python_path=None,
                  ipython_path=None,
                  init_file_path="./startup.py",
-                 verbose=1,
-                 max_exe_time=6000):
+                 session_cache_path = "",
+                 max_exe_time = 18000,
+                 verbose=1):
 
         self.kernel_name = kernel_name
         self.kernel_id = kernel_id
@@ -32,18 +35,19 @@ class CodeKernel(object):
         self.python_path = python_path
         self.ipython_path = ipython_path
         self.init_file_path = init_file_path
-        self.executed_cells = []
+        self.session_cache_path = session_cache_path
+        # self.executed_cells = []
+        self.max_exe_time = max_exe_time
+        self.nb = nbf.new_notebook()
+        self.nb_path = os.path.join(session_cache_path, 'notebook.ipynb')
         self.verbose = verbose
         self.interrupt_signal = False
-        self.max_exe_time = max_exe_time
-
 
         if python_path is None and ipython_path is None:
             env = None
         else:
             env = {"PATH": self.python_path + ":$PATH", "PYTHONPATH": self.python_path}
 
-        # Initialize the backend kernel
         self.kernel_manager = jupyter_client.KernelManager(kernel_name=IPYKERNEL,
                                                            connection_file=self.kernel_config_path,
                                                            exec_files=[self.init_file_path],
@@ -61,41 +65,13 @@ class CodeKernel(object):
         if verbose:
             pprint(self.kernel_manager.get_connection_info())
 
-        # Initialize the code kernel
         self.kernel = self.kernel_manager.blocking_client()
-        # self.kernel.load_connection_file()
         self.kernel.start_channels()
         print("Code kernel started.")
 
-    def execute(self, code):
-        self.kernel.execute(code)
-        try:
-            shell_msg = self.kernel.get_shell_msg(timeout=self.max_exe_time)
-            io_msg_content = self.kernel.get_iopub_msg(timeout=self.max_exe_time)['content']
-            msg_out_list = []
-            while True:
-                msg_out = io_msg_content
-                if 'name' in msg_out and msg_out['name'] != 'stderr':
-                    msg_out_list.append(msg_out)
-                elif 'data' in msg_out and 'image/png' in msg_out['data']:
-                    msg_out_list.append(msg_out)
-                ### Poll the message
-                try:
-                    io_msg_content = self.kernel.get_iopub_msg(timeout=self.max_exe_time)['content']
-                    if 'execution_state' in io_msg_content and io_msg_content['execution_state'] == 'idle':
-                        msg_out_list.append(msg_out)
-                        break
-                except queue.Empty:
-                    break
-            # msg_out = '\n'.join(msg_out_list)
-            return shell_msg, msg_out_list
-        except Exception as e:
-            print(e)
-            return None
-        
+
     def execute_code_(self, code):
         msg_id = self.kernel.execute(code)
-
         # Get the output of the code
         msg_list = []
         while True:
@@ -111,6 +87,7 @@ class CodeKernel(object):
                 continue
 
         all_output = []
+        # sign = None
         for iopub_msg in msg_list:
             if iopub_msg['msg_type'] == 'stream':
                 if iopub_msg['content'].get('name') == 'stdout':
@@ -121,44 +98,97 @@ class CodeKernel(object):
                     if 'text/plain' in iopub_msg['content']['data']:
                         output = iopub_msg['content']['data']['text/plain']
                         all_output.append(('execute_result_text', output))
+                    
                     if 'text/html' in iopub_msg['content']['data']:
                         output = iopub_msg['content']['data']['text/html']
                         all_output.append(('execute_result_html', output))
+                    
                     if 'image/png' in iopub_msg['content']['data']:
                         output = iopub_msg['content']['data']['image/png']
                         all_output.append(('execute_result_png', output))
+                        save_b64_2_img(output, self.session_cache_path)
+                    
                     if 'image/jpeg' in iopub_msg['content']['data']:
                         output = iopub_msg['content']['data']['image/jpeg']
                         all_output.append(('execute_result_jpeg', output))
+                        save_b64_2_img(output, self.session_cache_path)
             elif iopub_msg['msg_type'] == 'display_data':
                 if 'data' in iopub_msg['content']:
                     if 'text/plain' in iopub_msg['content']['data']:
                         output = iopub_msg['content']['data']['text/plain']
                         all_output.append(('display_text', output))
+                    
                     if 'text/html' in iopub_msg['content']['data']:
                         output = iopub_msg['content']['data']['text/html']
                         all_output.append(('display_html', output))
+                    
                     if 'image/png' in iopub_msg['content']['data']:
                         output = iopub_msg['content']['data']['image/png']
                         all_output.append(('display_png', output))
+                        save_b64_2_img(output, self.session_cache_path)
+                    
                     if 'image/jpeg' in iopub_msg['content']['data']:
                         output = iopub_msg['content']['data']['image/jpeg']
                         all_output.append(('display_jpeg', output))
+                        save_b64_2_img(output, self.session_cache_path)
             elif iopub_msg['msg_type'] == 'error':
                 if 'traceback' in iopub_msg['content']:
                     output = '\n'.join(iopub_msg['content']['traceback'])
                     all_output.append(('error', output))
+        # print("len of console messages: " + str(len(all_output)))
 
         return all_output
 
 
-    def export(self, file_path):
-        nb = nbf.v4.new_notebook()
-        nb.cells = self.executed_cells
-        print("cell: ",nb.cells)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            nbf.write(nb, f)
-        print(f"Notebook exported to {file_path}")
+    def execute_code(self, code) -> Tuple[list, str, str]:  #list[list, list, list]: #  Return: 1. sginal of resut, eg: text, error. 2. test to LLM. 3. The content to display.
+        text_to_llm = ["Summary of console output:\n"]
+        sign = list()
+        content_to_display = []
+        images = []
+        result = self.execute_code_(code)
+        self.add_code_cell_to_notebook(code)
+        #print("Console output: " ,content_to_display)
+        for mark, out_str in result:
+            if mark in ('stdout', 'execute_result_text', 'display_text'):
+                sign.append('text') #sign.append(mark)
+                text_to_llm.append(out_str)
+                content_to_display.append(out_str)
+                self.add_code_cell_output_to_notebook(out_str)
+
+            elif mark in ('execute_result_png', 'execute_result_jpeg', 'display_png', 'display_jpeg'):
+                sign.append("image")
+                text_to_llm.append(f'Generated an image file in {self.session_cache_path}.')
+                # content_to_display.append(out_str)
+                if 'png' in mark:
+                    images.append(('png', out_str))
+                    self.add_image_to_notebook(out_str, 'image/png')
+                else:
+                    images.append(('jpg', out_str))
+                    self.add_image_to_notebook(out_str, 'image/jpeg')
+
+            elif mark == 'error':
+                text_to_llm.append(delete_color_control_char(out_str)) # the error msg gave to LLM should be clean
+                sign.append('error')
+                self.add_code_cell_error_to_notebook(out_str)
+
+        return sign, '\n'.join(text_to_llm), '\n'.join(content_to_display)  #'\n'.join(text_to_gpt), content_to_display
+        #return sign, '\n'.join(text_to_llm), '\n'.join(content_to_display)
+
+    # def export(self, file_path):
+    #     # nb = nbf.v4.new_notebook()
+    #     # nb.cells = self.executed_cells
+    #     # print("cell: ", nb.cells)
+    #     with open(file_path, 'w', encoding='utf-8') as f:
+    #         nbf.write(nb, f)
+    #     print(f"Notebook exported to {file_path}")
+
+    # def export(self, file_path):
+    #     # nb = nbf.v4.new_notebook()
+    #     # nb.cells = self.executed_cells
+    #     # print("cell: ", nb.cells)
+    #     with open(file_path, 'w', encoding='utf-8') as f:
+    #         nbf.write(nb, f)
+    #     print(f"Notebook exported to {file_path}")
 
     def execute_interactive(self, code, verbose=False):
         shell_msg = self.kernel.execute_interactive(code)
@@ -231,10 +261,56 @@ class CodeKernel(object):
     def is_alive(self):
         return self.kernel.is_alive()
 
+    def add_code_cell_to_notebook(self, code):
+        code_cell = nbf.new_code_cell(source=code)
+        self.nb['cells'].append(code_cell)
 
-def b64_2_img(data):
-    buff = BytesIO(base64.b64decode(data))
-    return Image.open(buff)
+    def add_code_cell_output_to_notebook(self, output):
+        html_content = ansi_to_html(output)
+        cell_output = nbf.new_output(output_type='display_data', data={'text/html': html_content})
+        self.nb['cells'][-1]['outputs'].append(cell_output)
+
+    def add_code_cell_error_to_notebook(self, error):
+        nbf_error_output = nbf.new_output(
+            output_type='error',
+            ename='Error',
+            evalue='Error message',
+            traceback=[error]
+        )
+        self.nb['cells'][-1]['outputs'].append(nbf_error_output)
+
+    def add_image_to_notebook(self, image, mime_type):
+        image_output = nbf.new_output(output_type='display_data', data={mime_type: image})
+        self.nb['cells'][-1]['outputs'].append(image_output)
+
+    def add_markdown_to_notebook(self, content, title=None):
+        if title:
+            content = "##### " + title + ":\n" + content
+        markdown_cell = nbf.new_markdown_cell(content)
+        self.nb['cells'].append(markdown_cell)
+
+    def write_to_notebook(self, notebook_path):
+        with open(notebook_path, 'w', encoding='utf-8') as f:
+            nbformat.write(self.nb, f)
+        print(f"Notebook exported to {notebook_path}")
+
+def ansi_to_html(ansi_text):
+    converter = ansi2html.Ansi2HTMLConverter()
+    html_text = converter.convert(ansi_text)
+    return html_text
+
+
+def delete_color_control_char(string):
+    ansi_escape = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]')
+    return ansi_escape.sub('', string)
+
+def save_b64_2_img(data, path):
+    bs64_img = base64.b64decode(data)
+    img_path = os.path.join(path,f"{hash(time.time())}.png")
+    with open(img_path, 'wb') as f:
+            f.write(bs64_img)
+    print(f"Executing: Image saved in {img_path}")
+    return f"Image saved in {img_path}" #Image.open(buff)
 
 
 def clean_ansi_codes(input_string):
@@ -242,68 +318,9 @@ def clean_ansi_codes(input_string):
     return ansi_escape.sub('', input_string)
 
 
-def execute(code, kernel: CodeKernel) -> tuple[str, str | Image.Image]:
-    res = ""
-    res_type = None
-    # code = code.replace("<|observation|>", "")
-    # code = code.replace("<|assistant|>interpreter", "")
-    # code = code.replace("<|assistant|>", "")
-    # code = code.replace("<|user|>", "")
-    # code = code.replace("<|system|>", "")
-    msg, output_list = kernel.execute(code)
-
-    if msg['metadata']['status'] == "timeout":
-        return res_type, 'Timed out'
-    elif msg['metadata']['status'] == 'error':
-        return res_type, clean_ansi_codes('\n'.join(kernel.get_error_msg(msg, verbose=True))) #todo: change the res_type to error
-
-    if len(output_list) > 1:
-        res_list = []
-        for output in output_list:
-            if 'text' in output:
-                res_type = "text"
-                res = output['text']
-            elif 'data' in output:
-                for key in output['data']:
-                    if 'text/plain' in key:
-                        res_type = "text"
-                        res = output['data'][key]
-                    elif 'image/png' in key:
-                        res_type = "image"
-                        res = output['data'][key]
-                        break
-
-            if res_type == "image":
-                #return res_type, b64_2_img(res)
-                res_list.append(b64_2_img(res))
-            elif res_type == "text" or res_type == "traceback": #traceback is error?
-                #res = res
-                res_list.append(res)
-        if len(res_list) > 1 and res_list[-1] == res_list[-2]:
-            res_list.pop()
-
-        res = '\n'.join(res_list)
-        return res_type, res
-    else:
-        output = output_list[0]
-        if 'text' in output: #output is a dict, what situation is 'text' in output?
-            res_type = "text"
-            res = output['text']
-        elif 'data' in output:
-            for key in output['data']:
-                if 'text/plain' in key: #key = 'text/plain'
-                    res_type = "text"
-                    res = output['data'][key]
-                elif 'image/png' in key: # image will be present as html file?
-                    res_type = "image"
-                    res = output['data'][key]
-                    break
-
-        if res_type == "image":
-            return res_type, b64_2_img(res)
-        elif res_type == "text" or res_type == "traceback":  # traceback is error?
-            res = res
-        return res_type, res
+def execute(code, kernel: CodeKernel):
+    msg = kernel.execute_code(code)
+    return msg
 
 
 # @st.cache_resource
@@ -313,25 +330,43 @@ def get_kernel():
 
 
 if __name__ == '__main__':
-    kernel = CodeKernel()
+    kernel = CodeKernel(session_cache_path="./cache/cache_test/")
+    text_code = "print('Hello world!')"
+    print(text_code, kernel)
     table_code = """
     import pandas as pd
-    data = pd.read_csv('/Users/stephensun/Desktop/pypro/LAMBDA/cache/conv_cache/c1829f26-f6b3-4cbc-96a7-88aef2c33df2-2024-08-13/wine.csv')
+    data = pd.read_csv('data/wine.csv')
     data.head()
     """
     img_code = """
     import matplotlib.pyplot as plt
     x = [1, 2, 3, 4, 5]
     y = [2, 3, 5, 7, 6]
-    
+
     plt.plot(x, y)
-    
+
     plt.title('Simple Line Plot')
     plt.xlabel('X-axis')
     plt.ylabel('Y-axis')
     plt.show()
     """
-    res_type, res = execute(img_code, kernel)
-    print(res_type,res)
-    # kernel.export("my_notebook.ipynb")
+
+    file_code = """ 
+    text_content = "This is file test."
+    with open('example.txt', 'w', encoding='utf-8') as file:
+        file.write(text_content)
+    
+    print("saved example.txt")
+    """
+
+    error_code = "print(ss)"
+
+    none_code = "a = None"
+    # res_type, res = execute(img_code, kernel)
+    # print(res_type,res)
+    all_test_code = [text_code, table_code, img_code, file_code, error_code, none_code]
+    for i in all_test_code:
+        msg = execute(i, kernel)
+        print(msg)
+    kernel.write_to_notebook("./cache/cache_test/my_notebook2.ipynb")
 
