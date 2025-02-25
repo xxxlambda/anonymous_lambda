@@ -1,5 +1,5 @@
 import openai
-from prompt_engineering.prompts import SYSTEM_PROMPT
+from prompt_engineering.prompts import PROGRAMMER_PROMPT
 from knw_in import retrieval_knowledge
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -7,7 +7,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class Programmer:
 
-    def __init__(self, api_key, model="gpt-3.5-turbo-1106", base_url=None):
+    def __init__(self, api_key, model="gpt-4o-mini", base_url=None):
         self.client = openai.OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
         self.messages = []
@@ -17,7 +17,7 @@ class Programmer:
     def add_functions(self, function_lib: dict) -> None:
         self.function_repository = function_lib
 
-    def _call_chat_model(self, functions=None, include_functions=False, retrieval=True):
+    def _call_chat_model(self, functions=None, include_functions=False, retrieval=False):
         if retrieval:
             snaps = retrieval_knowledge(self.messages[-1]["content"])
             if snaps:
@@ -29,8 +29,6 @@ class Programmer:
         params = {
             "model": self.model,
             "messages": self.messages,
-            "max_tokens": 4000,
-            "temperature": 0.4,
         }
 
         if include_functions:
@@ -38,7 +36,10 @@ class Programmer:
             params['function_call'] = "auto"
 
         try:
-            return self.client.chat.completions.create(**params)
+            response = self.client.chat.completions.create(**params)
+            usage = response.usage
+            print(f"======Prompt Tokens: {usage.prompt_tokens}======Completion Tokens: {usage.completion_tokens}=======Total Tokens: {usage.total_tokens}")
+            return response
         except Exception as e:
             print(f"Error calling chat model: {e}")
             return None
@@ -51,7 +52,7 @@ class Programmer:
                 for chunk in snaps:
                     yield chunk
                 self.last_snaps = snaps
-                self.messages[-1]["content"] += snaps  # already add retrieval code to chat history
+                self.messages[-1]["content"] += snaps
             else:
                 self.last_snaps = None
 
@@ -75,23 +76,11 @@ class Programmer:
         except Exception as e:
             print(f"Error calling chat model: {e}")
             return None
-
-    def run(self, function_lib=None):
-        try:
-            if function_lib is None:
-                response = self._call_chat_model()
-                final_response = response.choices[0].message.content
-                return final_response
-
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            return None
-
     def clear(self):
         self.messages = [
             {
                 "role": "system",
-                "content": SYSTEM_PROMPT
+                "content": PROGRAMMER_PROMPT
             }
         ]
         self.function_repository = {}
