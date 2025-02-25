@@ -8,7 +8,7 @@ class data_cache:
     def __init__(self, file_path) -> None:
         self.file_path = file_path
         self.data_cache_path = os.path.dirname(file_path)
-        self.data = pd.read_csv(self.file_path, encoding='gbk')
+        self.data = pd.read_csv(self.file_path, encoding='utf-8')
         self.general_info = {}
 
     def get_description(self) -> dict:
