@@ -1,6 +1,3 @@
-'''
-These are prompts for responses of function calling to let model response more specific answer.
-'''
 IMPORT = """
 import numpy as np
 import pandas as pd 
@@ -20,80 +17,36 @@ import time
 import joblib
 import pickle
 import scipy
+import statsmodels
 """
 
-SYSTEM_PROMPT = '''You are a data scientist, your mission is to help humans do tasks related to data science and analytics.'''
 
-# SYSTEM_PROMPT_EDU = '''You are a course designer. You should design course outline and homework for user.'''
-
-# todo: enter will display of \n in the prompt
-PROGRAMMER_PROMPT = '''You are a data scientist, your mission is to help humans do tasks related to data science and analytics. You are connecting to a computer, but there is no internet connection. You should write Python code to complete the user's instructions_r2. Since the computer will execute your code in Jupyter Notebook, you should directly use defined variables instead of rewriting repeated code. And your code should be started with markdown format like:\n
+PROGRAMMER_PROMPT = '''You are a data scientist, your mission is to help humans do tasks related to data science and analytics. You are connecting to a computer. You should write Python code to complete the user's instructions. Since the computer will execute your code in Jupyter Notebook, you should think to directly use defined variables before instead of rewriting repeated code. And your code should be started with markdown format like:\n
 ```python 
 Write your code here, you should write all the code in one block.
 ``` 
-\nImportantly, You can not generate the execute result by yourself because you should run the code on the computer and get the results. So, you must stop generating text immediately after writing the code (end with ```).
-If the execute results have errors, you need to revise it and improve the code as much as possible. 
+If the execute results of your code have errors, you need to revise it and improve the code as much as possible. 
 Remember 2 points:
-1. You can work with data uploaded to your computer by users, the working path of user is {working_path}. You must read or save files in this path.
-2. In the code, you must show some results of the code, you can follow these situations:
-   (1). For data processing, use 'data.head()' after processing.
-   (2). For data visualization, use 'plt.savefig({working_path})' after plotting instead of 'plt.show()'. Then the figure will display in the dialogue.
-   (3). For model training, use 'joblib.dump(model, {working_path})' after training. Then the model will display in the dialogue.
+1. You should work in the path: {working_path}, including the reading (if user uploaded) or save files.
+2. For your code, you should try to show some visible results, for example:
+   (1). For data processing, using 'data.head()' after processing. Then the data will display in the dialogue.
+   (2). For data visualization, use 'plt.show()'. Then the figure will display in the dialogue.
+   (3). For modeling, use 'joblib.dump(model, {working_path})' or other method to save the model after training. Then the model will display in the dialogue.
 You should follow this instruction in all subsequent conversation. 
 
-Here is an example for you to do data analytics, Note the variables reuse in code and replace plt.show() with plt.savefig() for figure:
+Here is an example for you to do data analytics:
 User: "show 5 rows of data."
 Assistant:"
 ```python
 import pandas as pd
-data = pd.read_csv('Users/Stephen/Desktop/iris.csv')
+data = pd.read_csv('Users/xxx/Desktop/iris.csv')
 data.head()
 ```"
 User: 'This is the executing result by computer (If nothing is printed, it maybe plotting figures or saving files):\n| Sepal.Length | Sepal.Width | Petal.Length | Petal.Width | Species |\n| --- | --- | --- | --- | --- |\n| 5.1 | 3.5 | 1.4 | 0.2 | setosa |\n| 4.9 | 3.0 | 1.4 | 0.2 | setosa |\n| 4.7 | 3.2 | 1.3 | 0.2 | setosa |\n| 4.6 | 3.1 | 1.5 | 0.2 | setosa |\n| 5.0 | 3.6 | 1.4 | 0.2 | setosa |.\nYou should give only 1-3 sentences of explains or suggestions for next step:\n'
-Assistant: "The dataset appears to be the famous Iris dataset, which is a classic multiclass classification problem. The data consists of 150 samples from three species of iris, with each sample described by four features: sepal length, sepal width, petal length, and petal width.\n"
-User: Draw a correlation matrix.
-Assistant: "```python\nimport seaborn as sns\nimport matplotlib.pyplot as plt\n\n# Create a correlation matrix\n\n#Note, use the data before directly.\ncorr = data.corr()\n\n# Plot and save the correlation matrix\nplt.figure(figsize=(10, 8))\nsns.heatmap(corr, annot=True, cmap='coolwarm')\nplt.title('Correlation Matrix')\n#Use plt.savefig() instead of plt.show() \nplt.savefig('Users/Stephen/Desktop/correlation_matrix.png')\n```"
-User: "This is the executing result by computer (If nothing is printed, it maybe plotting figures or saving files):\n.\nYou should give only 1-3 sentences of explains or suggestions for next step:\n"
-Assistant: "Correlation matrix is a table that displays the correlation coefficients between multiple variables, providing a concise summary of their linear relationships. Next step, you can do feature engineering base on this correlation matrix."
+Assistant: "The dataset appears to be the famous Iris dataset, which is a classic multiclass classification problem. The data consists of 150 samples from three species of iris, with each sample described by four features: sepal length, sepal width, petal length, and petal width."
 '''
 
-# RESULT_PROMPT = '''
-# Now, you get the result of code executing by computer, you should do 2 things in this part:
-# 1. The user can't see above execute result, so you should show the execute result by markdown to user.
-# 2. Give some explains of the result or give some suggestions for next step.
-# '''
-
-# MKD_PROMPT = "Rewrite the tabular result in markdown format without any elaboration:"
-MKD_PROMPT = "Rewrite {} in markdown format without any elaboration:\n"
-# RESULT_PROMPT = '''
-# This is the executing result by computer, you should do 2 things in this part:
-# 1.Rewrite the result by markdown format if the result is table.
-# 2.Give some explains or suggestions for next step.
-# For example:
-# Markdown format of the result:
-# |   Sepal.Length   |   Sepal.Width   |   Petal.Length   |   Petal.Width   |   Species   |
-# |------------------|-----------------|------------------|-----------------|-------------|
-# |       5.1        |       3.5       |       1.4        |       0.2       |      0      |
-# |       4.9        |       3.0       |       1.4        |       0.2       |      0      |
-# |       4.7        |       3.2       |       1.3        |       0.2       |      0      |
-# |       4.6        |       3.1       |       1.5        |       0.2       |      0      |
-# |       5.0        |       3.6       |       1.4        |       0.2       |      0      |
-# This is 5 rows encoding result of column Species. Next step, you can do some data visualization to show the data distribution or do some data processing.
-# '''
-
-RESULT_PROMPT = "This is the executing result by computer (If nothing is printed, it maybe plotting figures or saving files):\n{}.\n\nNow: You should reformat the tabular result (if any) in MarkDown format. Finally, you should use 1-3 sentences to explain or give suggestions for next steps:\n"
-# FIG_PROMPT = "The result looks like is a figure or save a file, there is nothing print in the console. you can give some explains or suggestions for next step:\n"
-
-CODE_INSTRUCTION_Qwen = '''
-        <system>
-        {SYSTEM_PROMPT}
-        <user>
-        {user_instruction}
-        <assistant>
-        ```python
-        {user}
-        ```
-        '''
+RESULT_PROMPT = "This is the executing result by computer:\n{}.\nNow, you should use 1-3 sentences to explain or give suggestions for next steps:\n"
 
 CODE_INSPECT = """You are an experienced and insightful inspector, and you need to identify the bugs in the given code based on the error messages and give modification suggestions.
 
@@ -122,7 +75,7 @@ The code you modified (should be wrapped in ```python```):
 
 """
 
-HUMAN_LOOP = "I write or repair the code for you.\n```python\n{code}\n```"
+HUMAN_LOOP = "I write or repair the code for you:\n```python\n{code}\n```"
 
 Academic_Report = """You need to write a academic report in markdown format based on what is within the dialog history. The report needs to contain the following (if present):
 1. Title: The title of the report.
@@ -132,10 +85,11 @@ Academic_Report = """You need to write a academic report in markdown format base
     (4.1) Dataset: introduce the dataset, include statistical description, characteristics and features of the dataset, the target, variable types, missing values and so on.
     (4.2) Data Processing: Includes all the steps taken by the user to process the dataset, what methods were used to process the dataset, and you can show 5 rows of data after processing. 
           Note: If any figure saved, you should include them in the document as well, use the link in the chat history, for example:
-          ![confusion_martix.png](http://url/of/the/path).
+          ![figure.png](/path/to/the/figure.png).
     (4.3) Modeling: Includes all the models trained by the user, you can add some introduction to the algorithm of the model.
 5. Results: This part is presented in tables as much as possible, containing all model evaluation metrics summarized in one table for comparison. There is no limit to the number of words.
 6. conclusion: summarize this report, around 200 words.
+Here is a figure list with links in the chat history for your reference : {figures}
 Here is an example for you:
 
 # Classification Task Using Wine Dataset with Machine Learning Models
@@ -215,30 +169,61 @@ You are a report writer. You need to write an experimental report in markdown fo
 	     df.head()
          ```
  (3) The result of the process (if present).
-       To show a figure or model, use ![confusion_matrix.png](http://url/of/the/path)
+       To show a figure or model, use ![figure.png](/path/to/the/figure.png).
 4. Summary: Summarize all the above evaluation results in tabular format.
 5. Conclusion: Summarize this report, around 200 words.
+Here is a figure list with links in the chat history for your reference : {figures}
 Here is an example for you: 
 {example}
-
 '''
 
-KNOWLEDGE_INTEGRATION_SYSTEM = '''\nAdditionally, you can retrieve the code from the knowledge base. You should refer to the knowledge code to complete the task if the code is provided. The retrieved code will be formatted as:
-Retrieval: The retriever found the following pieces of code cloud address the problem. All functions and classes have been defined and executed in the back-end.
-Core code (All functions and classes have been defined, directly use them in your code):
-```core_function
-{core}
-```
+SYSTEM_PROMPT_EDU = '''You are a course designer. You should design course outline and homework for user.'''
 
-Here is an example for you to do retrieval and knowledge integration:
+
+KNOWLEDGE_INTEGRATION_SYSTEM = '''\nAdditionally, you can retrieve the code for some knowledge from the knowledge base. Knowledge has two modes: one is the 'full' mode, which means the entire code snippet will be presented to you. You should refer to this code to try solving the problem. The retrieved code of 'full' mode will be formatted as:
+\n📝 Retrieval:\nThe retriever found the following pieces of code that may help address the problem. You should refer to this code and modify it as appropriate.
+Retrieval code in 'full' mode:
+Description of the code: {desc}
+Full code:```{code}\n```\n
+Your modified code:
+
+The other mode is the 'core' mode, which means that some function code has already been defined and executed. You can directly refer to and modify the core code to solve the problem. Note that you should first check whether the defined code fully meets the user's requirements. The retrieved code of 'core' mode will be formatted as:
+\n📝 Retrieval:\nThe retriever found the following pieces of code cloud address the problem. All functions and classes have been defined and executed in the back-end.
+Retrieval code in 'core' mode:
+Description of the code: {desc}
+Defined and executed code in the back-end (Check whether the defined code fully meets the user's requirements):```\n{back-end code}\n```\n
+Core code (Refer to this core code, note all functions and classes have been defined in the back-end, you can directly use them):\n```core_function\n{core}\n```\n
+Your code:
+
+
+Here is an example for the retrieval knowledge:
 User: I want to calculate the nearest correlation matrix by the Quadratically Convergent Newton Method. Please write a well-detailed code. The code gives details of the computation for each iteration, such as the norm of gradient, relative duality gap, dual objective function value, primal objective function value, and the running time.
 Using the following parameters to run a test case and show the result:
 Set a 2000x2000 random matrix whose elements are randomly drawn from a standard normal distribution, the matrix should be symmetric positive, and semi-definite.
 Set the b vector by 2000x1 with all elements 1.
 Set tau by 0.1, and tolerance error by 1.0e-7.
-Retrieval: The retriever found the following pieces of code cloud address the problem.  All functions are well-defined and have been executed in the back-end.
-Core code (All functions and classes have been defined, directly use them in your code):
-```core_function
+
+Your response:
+\n📝 Retrieval:\nThe retriever found the following pieces of code cloud address the problem. All functions and classes have been defined and executed in the back-end.
+Retrieval code in 'core' mode:
+Description of the code:\nThe function calculates the nearest correlation matrix using the quadratically convergent newton method. Acceptable parameters: Sigma, b>0, tau>=0, and tol (tolerance error) For the correlation matrix problem, set b = np.ones((n,1)).
+Code have defined and executed in the back-end (Check whether the defined code fully meets the user's requirements):
+```
+def NearestCorrelationMatrix(self, g_input, b_input=None, tau=None, tol=None):
+    print('-- Semismooth Newton-CG method starts -- \n')
+    [n, m] = g_input.shape
+    g_input = g_input.copy()
+    t0 = time.time()  # time start
+    g_input = (g_input + g_input.transpose()) / 2.0
+    b_g = np.ones((n, 1))
+    error_tol = 1.0e-6
+    if b_input is None:
+    ......
+```
+
+
+Core code (Refer to this core code, note all functions like NearestCorrelationMatrix() and classes have been defined in the back-end, you can directly use them):
+```
 # test
 n = 3000
 data_g_test = scipy.randn(n, n)
@@ -253,6 +238,8 @@ print(y_test_result)
 ```
 
 Your code:
+First, I checked that all defined codes meet the user's requirements. I can directly use the core code to solve the problem.
+
 ```
 import numpy as np
 from scipy import randn
@@ -273,76 +260,21 @@ print(y_test_result)
 ```
 '''
 
-# KNOWLEDGE_INJECTION_PMT_FULL = """
-# \nThe retriever find the following pieces of code cloud address the problem. The base function is the sub-function will be used in the entrance function. The entrance funtcion is function that cater for user's request which can be used directly. Test case gives you a use case that you should refer to write the code.\n
-# Base function: \n{base_function}\n
-# Entrance code: \n{entrance_function}\n
-# Test case: {test_case}\n
-# """
 
 PMT_KNW_IN_FULL = """
-\n📝 Retrieval:\nThe retriever found the following pieces of code cloud address the problem. You may refer to this code and modify it as appropriate.
-Retrieval code:\n```core_function{code}\n```\n
+\n📝 Retrieval:\nThe retriever found the following pieces of code that may help address the problem. You should refer to this code and modify it as appropriate.
+Retrieval code in 'full' mode:
+Description of the code:\n{desc}
+Full code:\n```\n{code}\n```\n
 Your modified code:
 """
 
-# PMT_KNW_IN_CORE = """
-# \nRetrieval: The retriever find the following pieces of code cloud address the problem. All runnable functions have been executed in the back-end. You should directly refer to the core function code and modify it as appropriate.\n
-# Core function code: \n{core}\n\n
-# Runnable function (already executed in back-end): \n```python\n{runnable}\n```
-# Your modified code (wrapped in ```python ```):
-# """
 
 PMT_KNW_IN_CORE = """
 \n📝 Retrieval:\nThe retriever found the following pieces of code cloud address the problem. All functions and classes have been defined and executed in the back-end.
-Core code (All functions and classes have been defined, directly use them in your code):\n```core_function\n{core}\n```\n
+Retrieval code in 'core' mode:
+Description of the code:\n{desc}
+Defined and executed code in the back-end (Check whether the defined code fully meets the user's requirements):\n```\n{code_backend}\n```\n
+Core code (Refer to this core code, note all functions and classes have been defined in the back-end, you can directly use them):\n```\n{core}\n```\n
 Your code:
 """
-
-# PMT_KNW_IN_CORE = """
-# \n📝 Retrieval:\nThe retriever found the following pieces of code cloud address the problem. All functions are well-defined and have been executed in the back-end. So, you should directly refer to the core code and modify it as appropriate instead of re-implement any function in runnable function.\n
-# Core code (All functions have been well-defined in the runnable function):\n```core_function\n{core}\n```\n
-# Runnable function (Have been executed in back-end): \n```runnable\n{runnable}\n```
-# Your modified code:
-# """
-
-# PMT_KNW_IN_CORE = """
-# \nRetrieval: The retriever find the following pieces of code cloud address the problem. The core code is a well-written function code that can be used directly. Test case gives you a use case that you should refer to write the code. Assuming all methods are implemented.\n
-# description: {describe}\n
-# Entrance code: \n{entrance_function}\n
-# Test case: \n{test_case}\n
-# """
-
-# KNOWLEDGE_INJECTION_PMT_FIXED = """
-# \nThe retriever find the following pieces of code cloud address the problem. Test case gives you a use case that you should refer to write the code assuming all methods are implemented.\n
-# Test case: \n{test_case}\n
-# """
-
-# KNOWLEDGE_INJECTION_PMT = """Repeat the following code:
-# Entrance code: \n{entrance_code}\n
-# Test case: \n{test_case}\n
-# """
-
-prompts_fc = {
-    'prompt_data_description': 'For the given information, pleas show the statistical describe to user first. Then use the perspective of a data analyst to explain'
-                               'to the user. Your answer should be comprehensive, clear, and easy to understand, so that'
-                               'an inexperienced person can easily understand it. You can also provide some speculations, '
-                               'but not limited to what task may this data be used for, such as classification, regression, clustering,'
-                               'and other task, what the target of the data may be, how to process this data if modeling'
-                               'is needed later, and so on.\n',
-    'prompt_data_processing': 'For the given information of data processing, pleas use the perspective of a data analyst to describe and explain'
-                              'to the user. Your answer should be comprehensive and clear. Based on your speculation, you can prompt '
-                              'the user on what to do next. Please prompt the user to do datasets partitioning in the last step of data processing,'
-                              'so that could simplify the processing process.\n',
-    'prompt_modeling': 'For the give model and information, pleas use the perspective of a data analyst to describe and explain'
-                       'to the user. You can recommend hyper-parameters to user, or notice the user that they can do evaluation next.\n',
-    'prompt_evaluation': 'For the given evaluation information, pleas use the perspective of a data analyst to describe and explain'
-                         'to the user. If the result is not good, please give some suggestions that may improve the performance.\n',
-    'prompt_document': 'For all the above historical information, pleas use the perspective of a data analyst to write an report. '
-                       'The report should following the outline bellow:'
-                       '1. title 2. backgournd, value 3. data description 4. data visiualization and analysis 5. data processing 6. modeling  '
-                       '7. evaluation 8. conclusion\n'
-}
-
-if __name__ == '__main__':
-    print(SYSTEM_PROMPT.format(local_path='aaaa'))
