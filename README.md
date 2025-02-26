@@ -12,6 +12,7 @@ We introduce **LAMBDA**, a novel open-source, code-free multi-agent data analysi
 - **User Interface**: This includes a robust user interface that allows direct user intervention in the operational loop.
 - **Model Integration**: Flexibly integrates external models and algorithms to cater to customized data analysis needs.
 - **Automatic Report Generation**: Concentrate on high-value tasks, rather than spending time and resources on report writing and formatting.
+- **Jupyter Notebook Exporting**: Export the code and the results to Jupyter Notebook for reproduction and further analysis flexibly.
 
 ## Getting Started
 ### Installation
@@ -40,8 +41,7 @@ ipython kernel install --name lambda --user
 
 ### Configuration to Easy Start
 1. To use the Large Language Model, you should have an API key from [OpenAI](https://openai.com/api/pricing/) or other companies. Besides, we support OpenAI-Style interface for your local LLMs once deployed, available frameworks such as ollama[https://ollama.com/], [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory).
-
-3. Set your API key, models, working path, and OSS-related items in the config.yaml:
+2. Set your API key, models and working path in the config.yaml:
 ```bash
 #================================================================================================
 #                                       Config of the LLMs
