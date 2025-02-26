@@ -40,7 +40,7 @@ ipython kernel install --name lambda --user
 ```
 
 ### Configuration to Easy Start
-1. To use the Large Language Models, you should have an API key from [OpenAI](https://openai.com/api/pricing/) or other companies. Besides, we support OpenAI-Style interface for your local LLMs once deployed, available frameworks such as [ollama](https://ollama.com/), [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory).
+1. To use the Large Language Models, you should have an API key from [OpenAI](https://openai.com/api/pricing/) or other companies. Besides, we support OpenAI-Style interface for your local LLMs once deployed, available frameworks such as [LiteLLM](https://docs.litellm.ai/docs/), [ollama](https://ollama.com/), [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory).
 > Here are some products that offer free APIkeys for your reference: [OpenRouter](https://openrouter.ai/) and [SILICONFLOW](https://siliconflow.cn/)
 2. Set your API key, models and working path in the config.yaml:
 ```bash
