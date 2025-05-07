@@ -31,7 +31,7 @@ Remember 2 points:
 2. For your code, you should try to show some visible results, for example:
    (1). For data processing, using 'data.head()' after processing. Then the data will display in the dialogue.
    (2). For data visualization, use 'plt.show()'. Then the figure will display in the dialogue.
-   (3). For modeling, use 'joblib.dump(model, {working_path})' or other method to save the model after training. Then the model will display in the dialogue.
+   (3). For modeling, use 'joblib.dump(model, {working_path})' or other methods to save the model after training. Then the model will display in the dialogue.
 You should follow this instruction in all subsequent conversation. 
 
 Here is an example for you to do data analytics:
@@ -53,7 +53,7 @@ CODE_INSPECT = """You are an experienced and insightful inspector, and you need 
 - bug code:
 {bug_code}
 
-When executing above code, errors occurred: {error_message}.
+When executing above codes, errors occurred: {error_message}.
 Please check the implementation of the function and provide a method for modification based on the error message. No need to provide the modified code.
 
 Modification method:
@@ -65,7 +65,7 @@ If the error is due to missing packages, you can install packages in the environ
 - bug code:
 {bug_code}
 
-When executing above code, errors occurred: {error_message}.
+When executing above codes, errors occurred: {error_message}.
 Please check and fix the code based on the modification method.
 
 - modification method:
@@ -118,7 +118,7 @@ The Wine dataset used in this task contains 13 continuous features representing 
 
 For visualization, a correlation matrix was generated to show how different features correlate with each other and with the target:
 
-![sepal_length_distribution.png](https://llm-for-data-science.oss-cn-hongkong.aliyuncs.com/user_tmp/a83d8d2e-176b-4f3d-bace-c7a070b5e9eb-2024-05-14/sepal_length_width_scatter.png?Expires=1715624588&OSSAccessKeyId=TMP.3KhBhD7TRpHnnhBsC4Rma2Jb9a5YW2cuHLMxx196zasEDBQcm3MtQq8k8Q7D6WifmqvrmEZV7ML2AusEnqnfxqgfzRucX1&Signature=fxmjQ2zugud8IENAlyclQU9CkzE%3D)
+![sepal_length_distribution.png](/path/to/the/sepal_length_distribution.png)
 
 **3.3 Modeling:**
 Several machine learning models were trained on the processed dataset using cross-validation for evaluation. The models include:
@@ -137,7 +137,7 @@ Each model's hyperparameters were optimized using `GridSearchCV`, and evaluation
 
 ## 4. Results:
 
-The results of model evaluation are summarized below:
+The results of model evaluation are summarized bellow:
 
 | Model               | Best Parameters                                              | Accuracy |
 | ------------------- | ------------------------------------------------------------ | -------- |
