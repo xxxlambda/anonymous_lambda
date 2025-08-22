@@ -1,6 +1,7 @@
 # LAMBDA：A Large Model Based Data Agent (For Review)
 ---
-> Note: This repository is only used for peer review and code review
+> Note: This repository is only used for peer review and code review.
+> We updated, maintaining our latest code in [https://github.com/AMA-CMFAI/LAMBDA](https://github.com/AMA-CMFAI/LAMBDA)
 <body>
 
 We introduce **LAMBDA**, a novel open-source, code-free multi-agent data analysis system that harnesses the power of large models. LAMBDA is designed to address data analysis challenges in complex data-driven applications through the use of innovatively designed data agents that operate iteratively and generatively using natural language.
